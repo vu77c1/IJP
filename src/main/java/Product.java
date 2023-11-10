@@ -61,12 +61,12 @@ public class Product {
         return expirationDate.before(currentDate);
     }
 
-    public Product(String id, String name, Date expirationDate, int quantityInStock) {
+    public Product(String id, String name, Date expirationDate, int quantityInStock,int quantitySold) {
         this.id = id;
         this.name = name;
         this.expirationDate = expirationDate;
         this.quantityInStock = quantityInStock;
-        this.quantitySold = 0;
+        this.quantitySold = quantitySold;
     }
 
     public Product() {

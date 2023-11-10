@@ -1,4 +1,5 @@
 
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -7,8 +8,6 @@ import java.util.*;
 public class ProductManage {
     public static SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy");
     public static SimpleDateFormat formatterInput = new SimpleDateFormat("yyyy-MM-dd");
-    private static ArrayList<Product> listProduct = hashCodeProduct();
-    private static ArrayList<Product> teamProduct = new ArrayList<Product>();
     private static Scanner sc = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -20,18 +19,82 @@ public class ProductManage {
         } while (!"0".equalsIgnoreCase(String.valueOf(n)));
 
         sc.close();
+    }
+
+
+    public static ArrayList<Product> getProduct() {
+        ArrayList<Product> productInfoList = new ArrayList<>();
+        try {
+            JDBCQueryExecutor.openConnection();
+            String sql = "select * from Products";
+            ResultSet rs = JDBCQueryExecutor.executeSelectQuery(sql);
+            if (rs != null) {
+                try {
+                    while (rs.next()) {
+                        productInfoList.add(new Product(
+                                rs.getString("id"),
+                                rs.getString("name"),
+                                rs.getDate("expirationDate"),
+                                rs.getInt("quantityInStock"),
+                                rs.getInt("quantitySold")
+                        ));
+                    }
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        } catch (Exception ex2) {
+            ex2.printStackTrace();
+
+        } finally {
+            JDBCQueryExecutor.closeConnection();
+
+        }
+        return productInfoList;
+    }
+
+    public static ArrayList<Product> getProductSql(String sql) {
+        ArrayList<Product> productInfoList = new ArrayList<>();
+        JDBCQueryExecutor.openConnection();
+        ResultSet rs = JDBCQueryExecutor.executeSelectQuery(sql);
+        if (rs != null) {
+            try {
+                while (rs.next()) {
+                    productInfoList.add(new Product(
+                            rs.getString("id"),
+                            rs.getString("name"),
+                            rs.getDate("expirationDate"),
+                            rs.getInt("quantityInStock"),
+                            rs.getInt("quantitySold")
+                    ));
+                }
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        }
+        JDBCQueryExecutor.closeConnection();
+        return productInfoList;
 
     }
 
-    public static ArrayList<Product> hashCodeProduct() {
-        ArrayList<Product> productInfoList = new ArrayList<>();
-        productInfoList.add(new Product("1", "Product 1", new Date(), 100));
-        productInfoList.add(new Product("2", "Product 2", new Date(), 200));
-        productInfoList.add(new Product("3", "Product 3", new Date(), 150));
-        productInfoList.add(new Product("4", "Product 4", new Date(), 100));
-        productInfoList.add(new Product("5", "Product 5", new Date(), 200));
-        productInfoList.add(new Product("6", "Product 6", new Date(), 150));
-        return productInfoList;
+    public static void addProduct(Scanner sc) {
+        Product product = inputProduct(sc);
+        JDBCQueryExecutor.openConnection();
+        String sql = "insert into Products (id, name, expirationDate, quantityInStock, quantitySold)\n" +
+                "values (?,?,?,?,?)";
+        Object[] prams = {product.getId(),
+                product.getName(),
+                product.getExpirationDate(),
+                product.getQuantityInStock(),
+                0};
+        int rs = JDBCQueryExecutor.executeUpdateQuery(sql, prams);
+        if (rs > 0) {
+            System.out.println("Add success!!");
+        } else {
+            System.out.println("Add failed!!");
+        }
+        JDBCQueryExecutor.closeConnection();
+
     }
 
     public static int menu(Scanner sc) {
@@ -80,26 +143,22 @@ public class ProductManage {
 
             switch (n) {
                 case 1:
-                    productManage.inputInfo(sc);
-                    productManage.printProduct(listProduct);
+                    addProduct(sc);
                     break;
                 case 2:
-                    //listProduct=productManage.hashCodeProduct(listProduct);
-
-                    productManage.printProduct(listProduct);
+                    productManage.printProduct(getProduct());
                     break;
                 case 3:
                     productManage.upDateProductById(sc);
                     break;
                 case 4:
-                    productManage.deleteIsExpired(sc);
+                    productManage.deleteIsExpired();
                     break;
                 case 5:
                     productManage.SortProductDesc();
                     break;
                 case 6:
                     productManage.printProduct(searchProductByName(sc));
-                    ;
                     break;
                 case 7:
                     productManage.printGetProductById(sc);
@@ -136,14 +195,24 @@ public class ProductManage {
                 quantitySold = Integer.parseInt(sc.nextLine());
                 if (product.getQuantityInStock() < quantitySold) {
                     System.out.println("Invalid input:QuantitySold > quantityInStock!. Please enter input!!");
-
                 }
 
             } while (product.getQuantityInStock() < quantitySold);
-            product.setQuantitySold(quantitySold);
-            System.out.println("Update success product");
-            printProduct(product);
 
+            try {
+                JDBCQueryExecutor.openConnection();
+                String sql = "update Products set quantitySold =? where id=?";
+                Object[] prams = {quantitySold, product.getId()};
+                int rs = JDBCQueryExecutor.executeUpdateQuery(sql, prams);
+                if (rs > 0) {
+                    printProduct(getProductById(product.getId()));
+                    System.out.println("Update success");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                JDBCQueryExecutor.closeConnection();
+            }
 
         } else {
             System.out.println("Product does not exist");
@@ -155,8 +224,8 @@ public class ProductManage {
         System.out.println();
         System.out.printf("%-7S | %-15s | %-7s |%-7s |%-7s | \n", "ID", "NAME", "EXPIRATION_DATE", "quantityInStock", "quantitySold");
 
-            System.out.printf("%-7s | %-15s | %-7s      |%-7d         |%-7d      | \n", product.getId(), product.getName(),
-                    formatter.format(product.getExpirationDate()), product.getQuantityInStock(), product.getQuantitySold());
+        System.out.printf("%-7s | %-15s | %-7s      |%-7d         |%-7d      | \n", product.getId(), product.getName(),
+                formatter.format(product.getExpirationDate()), product.getQuantityInStock(), product.getQuantitySold());
     }
 
     public static ArrayList<Product> searchProductByName(Scanner sc) {
@@ -165,7 +234,7 @@ public class ProductManage {
         System.out.print("Input Name: ");
         name = sc.nextLine();
         ArrayList<Product> list = new ArrayList<>();
-        for (Product pr : listProduct) {
+        for (Product pr : getProduct()) {
             if (pr.getName().contains(name)) {
                 list.add(pr);
 
@@ -175,17 +244,28 @@ public class ProductManage {
         return list;
     }
 
-    public void deleteIsExpired(Scanner sc) {
-        ArrayList<Product> productsToRemove = new ArrayList<>();
+    public void deleteIsExpired() {
+        ArrayList<Product> listProduct = getProductSql("select * from products where expirationDate< GETDATE()");
         if (listProduct.size() > 0) {
-            for (Product pr : listProduct) {
-                if (pr.isExpired()) {
-                    productsToRemove.add(pr);
-                }
+            try {
+                JDBCQueryExecutor.openConnection();
+                String sql = "delete from  products where expirationDate< GETDATE()";
+                int rs = JDBCQueryExecutor.executeUpdateQuery(sql);
+                if (rs > 0) {
+                    printProduct(listProduct);
+                    System.out.println("Delete success");
 
+                } else {
+                    System.out.println("Product does not exist");
+
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                JDBCQueryExecutor.closeConnection();
             }
-            listProduct.removeAll(productsToRemove);
-            System.out.println("Delete success");
+
+
         } else {
             System.out.println("Product does not exist");
 
@@ -194,52 +274,34 @@ public class ProductManage {
 
     //Sort
     public void SortProductDesc() {
-        List<Product> list = listProduct;
-        Collections.sort(list, new ProductSalesComparator());
-        System.out.println(
-                "=======Sort the product list by Quantity Sold descending======");
-        System.out.println();
-        System.out.printf("%-7S | %-15s | %-7s |%-15s | \n", "ID", "NAME", "EXPIRATION_DATE", "QUANTITY_SOLD");
-        for (Product product : list) {
-            System.out.printf("%-7s | %-15s | %-7s      |%-15d | \n", product.getId(), product.getName(),
-                    formatter.format(product.getExpirationDate()), product.getQuantitySold());
-        }
-        System.out.println();
-        System.out.println(
-                "===========================END===============================");
+        printProduct(getProductSql("select * from Products order by quantitySold desc"));
     }
-
-    public void inputInfo(Scanner scanner) {
-        Product product = inputProduct(scanner);
-        listProduct.add(0, product);
-    }
-
 
     //Print product
     public void printProduct(ArrayList<Product> list) {
         if (list.size() > 0) {
             System.out.println(
-                    "=====================================LIST PRODUCT==========================");
-            System.out.println();
-            System.out.printf("%-7S | %-15s | %-7s |%-7s |%-7s | \n", "ID", "NAME", "EXPIRATION_DATE", "quantityInStock", "quantitySold");
+                    "============================================================================");
+            System.out.println("LIST.....");
+            System.out.printf("%-7S | %-15s | %-7s |%-7s |%-7s | \n", "ID", "NAME", "EXPIRATION_DATE", "quantityInStock".toUpperCase(), "quantitySold".toUpperCase());
             for (Product product : list) {
                 System.out.printf("%-7s | %-15s | %-7s      |%-7d         |%-7d      | \n", product.getId(), product.getName(),
                         formatter.format(product.getExpirationDate()), product.getQuantityInStock(), product.getQuantitySold());
             }
             System.out.println();
             System.out.println(
-                    "==================================END=====================================");
+                    "============================================================================");
         } else {
             System.out.println(
-                    "=====================================LIST PRODUCT==========================");
+                    "============================================================================");
             System.out.println("Product does not exist");
             System.out.println(
-                    "==================================END=====================================");
+                    "============================================================================");
         }
     }
 
-    public boolean isDuplicateId(String id) {
-        for (Product product : listProduct) {
+    public static boolean isDuplicateId(String id) {
+        for (Product product : getProduct()) {
             if (product.getId().equals(id)) {
                 return true; // ID bị trùng
             }
@@ -247,7 +309,7 @@ public class ProductManage {
         return false; // ID không bị trùng
     }
 
-    public Product inputProduct(Scanner scanner) {
+    public static Product inputProduct(Scanner scanner) {
         String id;
         do {
             System.out.print("id: ");
@@ -261,7 +323,6 @@ public class ProductManage {
 
         System.out.print("name: ");
         String name = scanner.nextLine();
-
 
         Date dateTime = null;
         do {
@@ -304,7 +365,7 @@ public class ProductManage {
         Product product = getProductById(id);
         if (product != null) {
             System.out.println(
-                    "===================================GET PRODUCT BY ID========================");
+                    "============================================================================");
             System.out.println();
             System.out.printf("%-7S | %-15s | %-7s |%-7s |%-7s | \n", "ID", "NAME", "EXPIRATION_DATE", "quantityInStock", "quantitySold");
 
@@ -313,15 +374,15 @@ public class ProductManage {
 
             System.out.println();
             System.out.println(
-                    "==================================END======================================");
+                    "============================================================================");
 
         } else {
             System.out.println(
-                    "===================================GET PRODUCT BY ID========================");
+                    "============================================================================");
             System.out.println("Product does not exist");
             System.out.println();
             System.out.println(
-                    "==================================END======================================");
+                    "============================================================================");
         }
 
     }
@@ -332,29 +393,47 @@ public class ProductManage {
         Product product = getProductById(id);
         if (product != null) {
             System.out.println(
-                    "===================================CHECK EXISTENCE PRODUCT========================");
+                    "============================================================================");
             printProduct(product);
 
             System.out.println();
-            listProduct.remove(product);
-            System.out.println("Product ID=" + product.getId() + " Delete success");
-            System.out.println(
-                    "==================================END======================================");
+            //listProduct.remove(product);
+            JDBCQueryExecutor.openConnection();
+            try {
+                String sql = "delete from Products where id=?";
+                Object[] prams = {product.getId()};
+                int rs = JDBCQueryExecutor.executeUpdateQuery(sql, prams);
+                if (rs > 0) {
+                    System.out.println("Product ID=" + product.getId() + " Delete success");
+                    System.out.println(
+                            "============================================================================");
+
+                } else {
+                    System.out.println("Product Delete failed");
+                }
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+
+            } finally {
+                JDBCQueryExecutor.closeConnection();
+
+            }
+
 
         } else {
             System.out.println(
-                    "===================================DELETE PRODUCT BY I========================");
+                    "============================================================================");
             System.out.println("Product does not exist");
-            System.out.println("Product Delete failed");
             System.out.println();
             System.out.println(
-                    "==================================END======================================");
+                    "============================================================================");
         }
 
     }
 
     public Product getProductById(String id) {
-        for (Product product : listProduct) {
+        for (Product product : getProduct()) {
             if (product.getId().equals(id)) {
                 return product; // Trả về sản phẩm có ID tương ứng
             }
@@ -362,67 +441,45 @@ public class ProductManage {
         return null; // Không tìm thấy sản phẩm với ID đã cho
     }
 
-    public int menuDeleteList(Scanner sc) {
-        int n;
-        do {
-            System.out.println("-------------------------------------------Delete list Product------------------------------------------");
-            System.out.println();
-            System.out.println("            0. Exit");
-            System.out.println("            1. Add Product to list delete");
-            System.out.println("            2. Delete");
-            System.out.println();
-            System.out.println("            What do you want to choose?");
-
-
-            int m = -1;
-
-            do {
-                try {
-                    System.out.print("Please choose....");
-                    m = Integer.parseInt(sc.nextLine());
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Please enter a valid integer.");
-                }
-            } while (m == -1);
-
-            n = m;
-        } while (!(n >= 1 && n <= 2));
-        return n;
-    }
-
     public void deleteListProduct(Scanner sc) {
-       // printProduct(listProduct);
-        int key = menuDeleteList(sc);
-        switch (key) {
-            case 1:
-                System.out.print("Add Product to list: ");
-                System.out.print("Input ID: ");
-                String id = sc.nextLine();
-                Product product = getProductById(id);
-                if (product != null) {
-                    teamProduct.add(product);
-                    printProduct(teamProduct);
-                } else {
-                    System.out.println("Product does not exist");
+        ArrayList<Product> temp = new ArrayList<>();
+        String id = null;
+        do {
+            System.out.println("Add product to list or Press [delete] to delete");
+            System.out.print("Input ID: ");
+            id = sc.nextLine();
+            Product product = getProductById(id);
+            if (product!=null&&!id.equals("delete"))
+            {
+                temp.add(product);
+            }
+            else {
+                System.out.println("product not exist");
+            }
+        }
+        while (!id.equals("delete"));
 
+        if (temp.size()>0)
+        {
+            printProduct(temp);
+            try
+            {
+                JDBCQueryExecutor.openConnection();
+                for (int i = 0; i < temp.size(); i++) {
+                    String sql="delete from Products where id=?";
+                    int row=JDBCQueryExecutor.executeUpdateQuery(sql,temp.get(i).getId());
                 }
 
-                break;
-            case 2:
-                System.out.print("Delete list Product: ");
-                if (teamProduct.size() > 0) {
-                    listProduct.removeAll(teamProduct);
-                    System.out.println("Delete success");
-                } else {
-                    System.out.println("Delete failed");
-                }
-                break;
 
-            default:
-                System.out.println("Wrong choice");
-                break;
+            }
+            catch (Exception ex)
+            {
+                ex.printStackTrace();
+            }
+            finally {
+                System.out.println("Delete success");
+                JDBCQueryExecutor.closeConnection();
+            }
         }
     }
-
-
 }
