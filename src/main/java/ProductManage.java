@@ -7,7 +7,6 @@ import java.util.*;
 
 public class ProductManage {
     public static SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy");
-    public static SimpleDateFormat formatterInput = new SimpleDateFormat("yyyy-MM-dd");
     private static Scanner sc = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -20,7 +19,6 @@ public class ProductManage {
 
         sc.close();
     }
-
 
     public static ArrayList<Product> getProduct() {
         ArrayList<Product> productInfoList = new ArrayList<>();
@@ -55,70 +53,79 @@ public class ProductManage {
 
     public static ArrayList<Product> getProductSql(String sql) {
         ArrayList<Product> productInfoList = new ArrayList<>();
-        JDBCQueryExecutor.openConnection();
-        ResultSet rs = JDBCQueryExecutor.executeSelectQuery(sql);
-        if (rs != null) {
-            try {
-                while (rs.next()) {
-                    productInfoList.add(new Product(
-                            rs.getString("id"),
-                            rs.getString("name"),
-                            rs.getDate("expirationDate"),
-                            rs.getInt("quantityInStock"),
-                            rs.getInt("quantitySold")
-                    ));
+        try {
+
+            JDBCQueryExecutor.openConnection();
+            ResultSet rs = JDBCQueryExecutor.executeSelectQuery(sql);
+            if (rs != null) {
+                try {
+                    while (rs.next()) {
+                        productInfoList.add(new Product(
+                                rs.getString("id"),
+                                rs.getString("name"),
+                                rs.getDate("expirationDate"),
+                                rs.getInt("quantityInStock"),
+                                rs.getInt("quantitySold")
+                        ));
+                    }
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
                 }
-            } catch (SQLException ex) {
-                ex.printStackTrace();
             }
+
+        } catch (Exception ex) {
+
+        } finally {
+            JDBCQueryExecutor.closeConnection();
         }
-        JDBCQueryExecutor.closeConnection();
         return productInfoList;
 
     }
 
     public static void addProduct(Scanner sc) {
-        Product product = inputProduct(sc);
-        JDBCQueryExecutor.openConnection();
-        String sql = "insert into Products (id, name, expirationDate, quantityInStock, quantitySold)\n" +
-                "values (?,?,?,?,?)";
-        Object[] prams = {product.getId(),
-                product.getName(),
-                product.getExpirationDate(),
-                product.getQuantityInStock(),
-                0};
-        int rs = JDBCQueryExecutor.executeUpdateQuery(sql, prams);
-        if (rs > 0) {
-            System.out.println("Add success!!");
-        } else {
-            System.out.println("Add failed!!");
-        }
-        JDBCQueryExecutor.closeConnection();
+        try {
+            Product product = inputProduct(sc);
+            JDBCQueryExecutor.openConnection();
+            String sql = "insert into Products (id, name, expirationDate, quantityInStock, quantitySold)\n" +
+                    "values (?,?,?,?,?)";
+            Object[] prams = {product.getId(),
+                    product.getName(),
+                    product.getExpirationDate(),
+                    product.getQuantityInStock(),
+                    0};
+            int rs = JDBCQueryExecutor.executeUpdateQuery(sql, prams);
+            if (rs > 0) {
+                System.out.println("Add success!!");
+            } else {
+                System.out.println("Add failed!!");
+            }
 
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        } finally {
+            JDBCQueryExecutor.closeConnection();
+        }
     }
 
     public static int menu(Scanner sc) {
         int n;
 
         do {
-            System.out.println("----------------DRUG STORE MANAGEMENT----------------");
-            System.out.println();
-
-            System.out.println();
-            System.out.println("            0. Exit");
-            System.out.println("            1. Add Product");
-            System.out.println("            2. List Product");
-            System.out.println("            3. Update Product");
-            System.out.println("            4. Delete expired products");
-            System.out.println("            5. Sort the product list by Quantity Sold descending");
-            System.out.println("            6. Search Product By Name");
-            System.out.println("            7. Get Product By ID");
-            System.out.println("            8. Delete Product By ID");
-            System.out.println("            9. Delete list Product");
-            System.out.println();
+            System.out.println(
+                    "====================================MENU========================================");
+            System.out.println("|            0. Exit                                                            |");
+            System.out.println("|            1. Add Product                                                     |");
+            System.out.println("|            2. List Product                                                    |");
+            System.out.println("|            3. Update Product                                                  |");
+            System.out.println("|            4. Delete expired products                                         |");
+            System.out.println("|            5. Sort the product list by Quantity Sold descending               |");
+            System.out.println("|            6. Search Product By Name                                          |");
+            System.out.println("|            7. Get Product By ID                                               |");
+            System.out.println("|            8. Delete Product By ID                                            |");
+            System.out.println("|            9. Delete list Product                                             |");
+            System.out.println(
+                    "===============================================================================");
             System.out.println("            What do you want to choose?");
-
-
             int m = -1;
 
             do {
@@ -397,7 +404,6 @@ public class ProductManage {
             printProduct(product);
 
             System.out.println();
-            //listProduct.remove(product);
             JDBCQueryExecutor.openConnection();
             try {
                 String sql = "delete from Products where id=?";
@@ -449,34 +455,27 @@ public class ProductManage {
             System.out.print("Input ID: ");
             id = sc.nextLine();
             Product product = getProductById(id);
-            if (product!=null&&!id.equals("delete"))
-            {
+            if (product != null && !id.equals("delete")) {
                 temp.add(product);
-            }
-            else {
+            } else {
                 System.out.println("product not exist");
             }
         }
         while (!id.equals("delete"));
 
-        if (temp.size()>0)
-        {
+        if (temp.size() > 0) {
             printProduct(temp);
-            try
-            {
+            try {
                 JDBCQueryExecutor.openConnection();
                 for (int i = 0; i < temp.size(); i++) {
-                    String sql="delete from Products where id=?";
-                    int row=JDBCQueryExecutor.executeUpdateQuery(sql,temp.get(i).getId());
+                    String sql = "delete from Products where id=?";
+                    int row = JDBCQueryExecutor.executeUpdateQuery(sql, temp.get(i).getId());
                 }
 
 
-            }
-            catch (Exception ex)
-            {
+            } catch (Exception ex) {
                 ex.printStackTrace();
-            }
-            finally {
+            } finally {
                 System.out.println("Delete success");
                 JDBCQueryExecutor.closeConnection();
             }
